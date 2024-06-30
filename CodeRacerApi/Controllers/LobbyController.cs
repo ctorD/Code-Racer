@@ -2,9 +2,12 @@ using System.Security.Claims;
 using CodeRacerApi.Models;
 using CodeRacerApi.Models.Lobby;
 using CodeRacerApi.Models.SQLite;
+using CodeRacerApi.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Octokit;
+using User = CodeRacerApi.Models.SQLite.User;
 
 namespace CodeRacerApi.Controllers;
 
@@ -13,10 +16,12 @@ namespace CodeRacerApi.Controllers;
 public class LobbyController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly GithubService _githubService;
 
-    public LobbyController(AppDbContext context)
+    public LobbyController(AppDbContext context, GithubService githubService)
     {
         _context = context;
+        _githubService = githubService;
     }
 
     [HttpGet]
@@ -32,7 +37,7 @@ public class LobbyController : ControllerBase
             Name = l.LobbyName,
             Users = l.Users.Select(u => u.Username).ToList()
         });
-        
+
         return Ok(lobbyResponses);
     }
 
@@ -42,7 +47,7 @@ public class LobbyController : ControllerBase
         var lobby = await _context.Lobbys
             .Include(l => l.Users)
             .FirstOrDefaultAsync(l => l.Id == id);
-        
+
         if (lobby == null)
         {
             return NotFound();
@@ -54,7 +59,7 @@ public class LobbyController : ControllerBase
             Name = lobby.LobbyName,
             Users = lobby.Users.Select(u => u.Username).ToList()
         };
-        
+
         return Ok(lobbyResponse);
     }
 
@@ -66,15 +71,17 @@ public class LobbyController : ControllerBase
             return BadRequest();
         }
 
-        _context.Add(new Lobby()
+        var snippet = await _githubService.GetSnippet(LangTextToEnum(lobby.Language));
+        await _context.AddAsync(new Lobby()
         {
-            LobbyName = lobby.Id
+            LobbyName = lobby.Id,
+            Snippet = snippet
         });
         await _context.SaveChangesAsync();
         return Ok();
     }
 
-    [HttpPost("Join")]
+    [HttpPost("{id}")]
     public async Task<IActionResult> JoinLobby(int id)
     {
         if (!ModelState.IsValid)
@@ -96,5 +103,20 @@ public class LobbyController : ControllerBase
     {
         var id = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
         return _context.Users.FirstOrDefaultAsync(u => u.Id == id);
+    }
+
+    private Language LangTextToEnum(string lang)
+    {
+        switch (lang)
+        {
+            case "js":
+                return Language.JavaScript;
+            case "ts":
+                return Language.TypeScript;
+            case "csharp":
+                return Language.CSharp;
+            default:
+                return Language.JavaScript;
+        }
     }
 }

@@ -7,9 +7,13 @@ public class GithubService
 {
     private readonly GitHubClient _client;
 
-    public GithubService(GitHubClient client)
+    public GithubService(IConfiguration configuration)
     {
-        _client = client;
+        var gitKey = configuration.GetValue<string>("GitKey"); 
+        _client = new GitHubClient(new ProductHeaderValue("Code-Racer"))
+        {
+            Credentials = new Credentials(gitKey)
+        };
     }
     
     public async Task<string> GetSnippet(Language lang)
@@ -28,8 +32,7 @@ public class GithubService
         var keyword = GetKeyword(lang);
         var allIndexes = GetAllIndexes(rawCodeString, keyword);
         var randomIndex = new Random().Next(0, allIndexes.Count);
-        rawCodeString =
-            rawCodeString.Substring(allIndexes[randomIndex], rawCodeString.Length - allIndexes[randomIndex]);
+        rawCodeString = rawCodeString.Substring(allIndexes[randomIndex], rawCodeString.Length - allIndexes[randomIndex]);
         var beforeFunctionBlock = rawCodeString.Substring(0, rawCodeString.IndexOf('{'));
         var matches = Regex.Matches(rawCodeString, @"{((?>[^{}]+|{(?<c>)|}(?<-c>))*(?(c)(?!)))");
         var functionBlock = matches[0].Value + "\n }";
