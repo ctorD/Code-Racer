@@ -1,0 +1,6 @@
+@CodeRacerApi_HostAddress = http://localhost:5176
+
+GET {{CodeRacerApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
